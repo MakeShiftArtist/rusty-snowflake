@@ -2,8 +2,15 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Snowflake {
+    /// The worker ID of the snowflake.
+    /// This is a unique identifier for the host or thread that created the snowflake.
     pub worker_id: u64,
+    /// The sequence number of the snowflake.
+    /// This increments every time the snowflake is created within the same second.
+    /// This will automatically reset to 0 when the timestamp changes or
+    /// when the sequence overflows (2^64 - 1).
     pub sequence: u64,
+    /// The timestamp of the last snowflake creation in seconds since the epoch (1970-01-01 00:00:00 UTC).
     pub last_timestamp: u64,
 }
 
@@ -36,7 +43,7 @@ impl Snowflake {
         if timestamp < self.last_timestamp {
             timestamp = self.last_timestamp; // Reset timestamp
         } else if timestamp == self.last_timestamp {
-            self.sequence = (self.sequence + 1) & 0xFFF; // Increment sequence
+            self.sequence = (self.sequence + 1) & 0xFFFF; // Increment sequence
             if self.sequence == 0 {
                 timestamp = self.wait_next_sec(timestamp);
             }
@@ -214,7 +221,7 @@ mod tests {
 
         let mut snowflake = Snowflake {
             worker_id: 1,
-            sequence: 0xFFF, // Maximum sequence value
+            sequence: 0xFFFF, // Maximum sequence value
             last_timestamp: time,
         };
 
