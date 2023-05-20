@@ -8,7 +8,7 @@ pub struct Snowflake {
     /// The sequence number of the snowflake.
     /// This increments every time the snowflake is created within the same second.
     /// This will automatically reset to 0 when the timestamp changes or
-    /// when the sequence overflows (2^64 - 1).
+    /// when the sequence overflows (2^16 - 1).
     pub sequence: u64,
     /// The timestamp of the last snowflake creation in seconds since the epoch (1970-01-01 00:00:00 UTC).
     pub last_timestamp: u64,
