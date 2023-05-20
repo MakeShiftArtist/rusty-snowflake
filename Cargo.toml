@@ -2,7 +2,7 @@
 name = "rusty-snowflake"
 authors = ["MakeShiftArist <MakeShiftDevelopment@proton.me"]
 description = "A library for generating and parsing Snowflake IDs"
-licnse = "MIT"
+license = "MIT"
 version = "0.1.0"
 edition = "2021"
 
