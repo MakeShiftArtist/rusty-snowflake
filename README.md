@@ -1,9 +1,8 @@
 # rusty-snowflake
-
-![Crates.io Version](https://img.shields.io/crates/v/rusty-snowflake)
-![Crates.io License](https://img.shields.io/crates/l/rusty-snowflake)
+[![Crates.io Version](https://img.shields.io/crates/v/rusty-snowflake)](https://crates.io/crates/rusty-snowflake)
+[![Crates.io License](https://img.shields.io/crates/l/rusty-snowflake)](https://github.com/MakeShiftArtist/rusty-snowflake/blob/master/LICENSE)
 [![Tests](https://github.com/MakeShiftArtist/rusty-snowflake/actions/workflows/test_code.yml/badge.svg)](https://github.com/MakeShiftArtist/rusty-snowflake/actions/workflows/test_code.yml)
-![docs.rs](https://img.shields.io/docsrs/rusty-snowflake)
+[![docs.rs](https://img.shields.io/docsrs/rusty-snowflake)](https://docs.rs/rusty-snowflake)
 
 This library is a Snowflake ID generator and parser written entirely in Rust.
 
