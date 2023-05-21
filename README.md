@@ -1,6 +1,11 @@
 # rusty-snowflake
 
-rusty-snowflake is a Rust library for generating and parsing snowflake IDs.
+![Crates.io Version](https://img.shields.io/crates/v/rusty-snowflake)
+![Crates.io License](https://img.shields.io/crates/l/rusty-snowflake)
+[![Tests](https://github.com/MakeShiftArtist/rusty-snowflake/actions/workflows/test_code.yml/badge.svg)](https://github.com/MakeShiftArtist/rusty-snowflake/actions/workflows/test_code.yml)
+![docs.rs](https://img.shields.io/docsrs/rusty-snowflake)
+
+This library is a Snowflake ID generator and parser written entirely in Rust.
 
 ## Features
 
