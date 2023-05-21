@@ -1,0 +1,41 @@
+name: Tests
+
+on:
+    push:
+
+    pull_request:
+        branches:
+            - master
+
+jobs:
+    coverage:
+        name: Run Code Coverage
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v2
+
+            - name: Cache
+              id: cache
+              uses: actions/cache@v2
+              with:
+                  path: |
+                      ~/.cargo/registry
+                      ~/.cargo/git
+                      target
+                  key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+            - name: Install LLVM and Clang
+              run: sudo apt-get install -y llvm clang
+
+            - name: Install cargo-tarpaulin
+              run: cargo install cargo-tarpaulin
+
+            - name: Run tests with code coverage
+              run: cargo tarpaulin --out Xml --exclude-files none
+
+            - name: Upload coverage report
+              uses: codecov/codecov-action@v2
+              with:
+                  file: ./coverage.xml
