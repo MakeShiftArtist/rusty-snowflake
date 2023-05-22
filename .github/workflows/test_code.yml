@@ -31,6 +31,7 @@ jobs:
               run: sudo apt-get install -y llvm clang
 
             - name: Install cargo-tarpaulin
+              if: steps.cache.outputs.cache-hit != 'true'
               run: cargo install cargo-tarpaulin
 
             - name: Run tests with code coverage
