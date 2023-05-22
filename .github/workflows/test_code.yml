@@ -23,13 +23,18 @@ jobs:
                   path: |
                       ~/.cargo/registry
                       ~/.cargo/git
+                      ~/.cargo/bin
                       target
                   key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-            - name: Install LLVM and Clang
-              run: sudo apt-get install -y llvm clang
+            - name: Set up Rust
+              if: steps.cache.outputs.cache-hit != 'true'
+              uses: actions-rs/toolchain@v1
+              with:
+                  toolchain: stable
 
             - name: Install cargo-tarpaulin
+              if: steps.cache.outputs.cache-hit != 'true'
               run: cargo install cargo-tarpaulin
 
             - name: Run tests with code coverage
