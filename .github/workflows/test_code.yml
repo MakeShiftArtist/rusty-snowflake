@@ -28,6 +28,7 @@ jobs:
                   key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
             - name: Set up Rust
+              if: steps.cache.outputs.cache-hit != 'true'
               uses: actions-rs/toolchain@v1
               with:
                   toolchain: stable
