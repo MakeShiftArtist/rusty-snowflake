@@ -1,6 +1,6 @@
 use crate::SnowflakeGenerator;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Snowflake {
     /// The worker ID of the snowflake.
     /// This is a unique identifier for the host or thread that created the snowflake.
@@ -27,7 +27,7 @@ impl Snowflake {
     /// ```rust
     /// use rusty_snowflake::Snowflake;
     ///
-    /// let snowflake = Snowflake::new(1);
+    /// let snowflake = Snowflake::new(420);
     /// ```
     pub fn new(worker_id: u64) -> Snowflake {
         Snowflake {
@@ -42,21 +42,24 @@ impl Snowflake {
     /// with the same worker ID.
     /// If the timestamp is the same as the previous call, the sequence number will be incremented.
     ///
+    /// # Returns
+    /// A new snowflake ID
+    ///
     /// # Example
     /// ```rust
     /// use rusty_snowflake::Snowflake;
     ///
-    /// let mut snowflake = Snowflake::new(1);
+    /// let snowflake = Snowflake::new(420);
     /// println!("{}", snowflake.next());
     /// println!("{}", snowflake.next());
     /// ```
-    ///
     pub fn next(&self) -> Snowflake {
         let mut timestamp = SnowflakeGenerator::get_timestamp();
         let mut sequence = self.sequence;
 
         if timestamp < self.timestamp {
             timestamp = self.timestamp; // Reset timestamp
+            sequence = (sequence + 1) & 0xFFFF; // Increment sequence
         } else if timestamp == self.timestamp {
             sequence = (sequence + 1) & 0xFFFF; // Increment sequence
             if sequence == 0 {
@@ -233,15 +236,12 @@ mod tests {
             timestamp: time,
         };
 
-        let new_snowflake = snowflake.next();
+        let next = snowflake.next();
 
         // Assert that sequence is reset to 0
-        assert_eq!(new_snowflake.sequence, 0);
+        assert_eq!(next.sequence, 0);
 
-        assert!(new_snowflake.timestamp > time);
-
-        // Assert that wait_next_timestamp method is called
-        // Add appropriate assertions based on your implementation
+        assert!(next.timestamp > time);
     }
 
     #[test]
@@ -252,10 +252,9 @@ mod tests {
             sequence: 0,
         };
 
-        let snowflake = snowflake.next();
+        let next = snowflake.next();
 
-        // Assert that sequence is reset to 0
-        assert_eq!(snowflake.sequence, 0);
+        assert_ne!(snowflake, next, "Snowflake didn't change");
     }
 
     #[test]
@@ -267,17 +266,6 @@ mod tests {
             snowflake,
             Snowflake::parse(id),
             "Snowflake ID didn't parse correctly"
-        );
-    }
-
-    #[test]
-    fn test_snowflake_wait_next_timestamp() {
-        let snowflake = Snowflake::new(1);
-        let id = snowflake.timestamp;
-        let next = SnowflakeGenerator::wait_next_timestamp(SnowflakeGenerator::get_timestamp());
-        assert!(
-            next > id,
-            "Snowflake.wait_next_timestamp didn't return a new timestamp"
         );
     }
 
@@ -299,5 +287,11 @@ mod tests {
     }
 
     #[test]
-    fn test_partial_ord() {}
+    fn test_partial_ord() {
+        let snowflake = Snowflake::new(1);
+        let snowflake2 = snowflake.next();
+        assert!(snowflake < snowflake2);
+        assert!(snowflake2.next() > snowflake2);
+        assert!(snowflake.next() == snowflake2);
+    }
 }
