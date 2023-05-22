@@ -1,6 +1,6 @@
-use std::time::{SystemTime, UNIX_EPOCH};
+use crate::SnowflakeGenerator;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Snowflake {
     /// The worker ID of the snowflake.
     /// This is a unique identifier for the host or thread that created the snowflake.
@@ -10,16 +10,30 @@ pub struct Snowflake {
     /// This will automatically reset to 0 when the timestamp changes or
     /// when the sequence overflows (2^16 - 1).
     pub sequence: u64,
-    /// The timestamp of the last snowflake creation in seconds since the epoch (1970-01-01 00:00:00 UTC).
-    pub last_timestamp: u64,
+    /// The timestamp of the snowflake creation in seconds since the epoch (1970-01-01 00:00:00 UTC).
+    pub timestamp: u64,
 }
 
 impl Snowflake {
+    /// Create a new snowflake with the given worker ID
+    ///
+    /// # Arguments
+    /// * `worker_id` - The worker ID of the snowflake
+    ///
+    /// # Returns
+    /// A new `Snowflake`
+    ///
+    /// # Example
+    /// ```rust
+    /// use rusty_snowflake::Snowflake;
+    ///
+    /// let snowflake = Snowflake::new(420);
+    /// ```
     pub fn new(worker_id: u64) -> Snowflake {
         Snowflake {
             worker_id,
             sequence: 0,
-            last_timestamp: Snowflake::get_timestamp(),
+            timestamp: SnowflakeGenerator::get_timestamp(),
         }
     }
 
@@ -28,35 +42,42 @@ impl Snowflake {
     /// with the same worker ID.
     /// If the timestamp is the same as the previous call, the sequence number will be incremented.
     ///
+    /// # Returns
+    /// A new snowflake ID
+    ///
     /// # Example
     /// ```rust
     /// use rusty_snowflake::Snowflake;
     ///
-    /// let mut snowflake = Snowflake::new(1);
-    /// println!("{}", snowflake.next());
-    /// println!("{}", snowflake.next());
+    /// let snowflake = Snowflake::new(420);
+    /// let next = snowflake.next();
+    /// println!("{}", next);
+    /// println!("{}", next.next());
     /// ```
-    ///
-    pub fn next(&mut self) -> u64 {
-        let mut timestamp = Snowflake::get_timestamp();
+    pub fn next(&self) -> Snowflake {
+        let mut timestamp = SnowflakeGenerator::get_timestamp();
+        let mut sequence = self.sequence;
 
-        if timestamp < self.last_timestamp {
-            timestamp = self.last_timestamp; // Reset timestamp
-        } else if timestamp == self.last_timestamp {
-            self.sequence = (self.sequence + 1) & 0xFFFF; // Increment sequence
-            if self.sequence == 0 {
-                timestamp = self.wait_next_sec(timestamp);
+        if timestamp < self.timestamp {
+            timestamp = self.timestamp; // Reset timestamp
+            sequence = (sequence + 1) & 0xFFFF; // Increment sequence
+        } else if timestamp == self.timestamp {
+            sequence = (sequence + 1) & 0xFFFF; // Increment sequence
+            if sequence == 0 {
+                timestamp = SnowflakeGenerator::wait_next_timestamp(timestamp); // Update timestamp when sequence overflows
             }
         } else {
-            self.sequence = 0;
+            sequence = 0; // Reset sequence because timestamp changed
         }
 
-        self.last_timestamp = timestamp;
-
-        self.to_id()
+        Snowflake {
+            worker_id: self.worker_id,
+            sequence,
+            timestamp,
+        }
     }
 
-    /// Convert a snowflake ID into a u64
+    /// Convert a Snowflake ID into a u64 id
     ///
     /// # Example
     ///
@@ -72,7 +93,7 @@ impl Snowflake {
     /// assert_eq!(snowflake, parsed);
     /// ```
     pub fn to_id(&self) -> u64 {
-        (self.last_timestamp << 22) | (self.worker_id << 12) | self.sequence
+        (self.timestamp << 22) | (self.worker_id << 12) | self.sequence
     }
 
     /// Parse a snowflake ID into a `Snowflake`
@@ -80,9 +101,9 @@ impl Snowflake {
     /// ```rust
     /// use rusty_snowflake::Snowflake;
     ///
-    /// let mut snowflake = Snowflake::new(1);
+    /// let snowflake = Snowflake::new(1);
     ///
-    /// let id = snowflake.next();
+    /// let id = snowflake.to_id();
     /// let parsed = Snowflake::parse(id);
     ///
     /// assert_eq!(snowflake, parsed);
@@ -95,34 +116,8 @@ impl Snowflake {
         Snowflake {
             worker_id,
             sequence,
-            last_timestamp: timestamp,
+            timestamp: timestamp,
         }
-    }
-
-    /// Get the current timestamp in seconds since the epoch (1970-01-01 00:00:00 UTC).
-    ///
-    /// # Returns
-    /// The current timestamp in seconds
-    fn get_timestamp() -> u64 {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("SystemTime before UNIX EPOCH!")
-            .as_secs()
-    }
-
-    /// Wait for the next second and return the timestamp
-    ///
-    /// # Arguments
-    /// * `current_timestamp` - The current timestamp in seconds
-    ///
-    /// # Returns
-    /// The timestamp of the next second
-    fn wait_next_sec(&self, current_timestamp: u64) -> u64 {
-        let mut timestamp = Snowflake::get_timestamp();
-        while timestamp <= current_timestamp {
-            timestamp = Snowflake::get_timestamp();
-        }
-        timestamp
     }
 }
 
@@ -146,6 +141,18 @@ impl From<u64> for Snowflake {
     }
 }
 
+impl Ord for Snowflake {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.to_id().cmp(&other.to_id())
+    }
+}
+
+impl PartialOrd for Snowflake {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -165,7 +172,8 @@ mod tests {
         let mut snowflake = Snowflake::new(1);
 
         for i in 1..10 {
-            let id = snowflake.next();
+            snowflake = snowflake.next();
+            let id = snowflake.to_id();
             assert_eq!(Snowflake::parse(id).sequence, i);
         }
     }
@@ -173,7 +181,7 @@ mod tests {
     #[test]
     fn test_timestamp() {
         let snowflake = Snowflake::new(1);
-        assert_eq!(snowflake.last_timestamp, Snowflake::get_timestamp());
+        assert_eq!(snowflake.timestamp, SnowflakeGenerator::get_timestamp());
     }
 
     #[test]
@@ -185,18 +193,18 @@ mod tests {
     }
     #[test]
     fn test_next_timestamp_change() {
-        let mut snowflake = Snowflake {
+        let snowflake = Snowflake {
             worker_id: 1,
-            last_timestamp: 100,
+            timestamp: 100,
             sequence: 0,
         };
 
-        snowflake.next();
+        let snowflake = snowflake.next();
 
-        // Assert that timestamp is updated to last_timestamp
+        // Assert that timestamp is updated to timestamp
         assert_eq!(
-            snowflake.last_timestamp,
-            Snowflake::get_timestamp(),
+            snowflake.timestamp,
+            SnowflakeGenerator::get_timestamp(),
             "Timestamp didn't update correctly"
         );
     }
@@ -205,50 +213,49 @@ mod tests {
     fn test_next_sequence_change() {
         let mut snowflake = Snowflake {
             worker_id: 1,
-            last_timestamp: Snowflake::get_timestamp(),
+            timestamp: SnowflakeGenerator::get_timestamp(),
             sequence: 0,
         };
 
-        snowflake.next();
+        snowflake = snowflake.next();
 
         // Assert that sequence is incremented
         assert_eq!(snowflake.sequence, 1);
+
+        snowflake = snowflake.next();
+
+        assert_eq!(snowflake.sequence, 2);
     }
 
     #[test]
     fn test_next_when_sequence_overflows() {
-        let time = Snowflake::get_timestamp();
+        let time = SnowflakeGenerator::get_timestamp();
 
-        let mut snowflake = Snowflake {
+        let snowflake = Snowflake {
             worker_id: 1,
             sequence: 0xFFFF, // Maximum sequence value
-            last_timestamp: time,
+            timestamp: time,
         };
 
-        snowflake.next();
+        let next = snowflake.next();
 
         // Assert that sequence is reset to 0
-        assert_eq!(snowflake.sequence, 0);
-        assert!(snowflake.last_timestamp > time);
+        assert_eq!(next.sequence, 0);
 
-        // Assert that wait_next_sec method is called
-        // Add appropriate assertions based on your implementation
+        assert!(next.timestamp > time);
     }
 
     #[test]
-    fn test_next_when_timestamp_is_greater_than_last_timestamp() {
-        let mut snowflake = Snowflake {
+    fn test_next_when_timestamp_is_greater_than_timestamp() {
+        let snowflake = Snowflake {
             worker_id: 1,
-            last_timestamp: Snowflake::get_timestamp() + 100,
+            timestamp: SnowflakeGenerator::get_timestamp() + 100,
             sequence: 0,
         };
 
-        snowflake.next();
+        let next = snowflake.next();
 
-        // Assert that sequence is reset to 0
-        assert_eq!(snowflake.sequence, 0);
-
-        // Add appropriate assertions based on your implementation
+        assert_ne!(snowflake, next, "Snowflake didn't change");
     }
 
     #[test]
@@ -260,17 +267,6 @@ mod tests {
             snowflake,
             Snowflake::parse(id),
             "Snowflake ID didn't parse correctly"
-        );
-    }
-
-    #[test]
-    fn test_snowflake_wait_next_sec() {
-        let snowflake = Snowflake::new(1);
-        let id = snowflake.last_timestamp;
-        let next = snowflake.wait_next_sec(Snowflake::get_timestamp());
-        assert!(
-            next > id,
-            "Snowflake.wait_next_sec didn't return a new timestamp"
         );
     }
 
@@ -289,5 +285,14 @@ mod tests {
         assert_eq!(snowflake, from_u64);
 
         assert_eq!(Snowflake::from(1), Snowflake::parse(id));
+    }
+
+    #[test]
+    fn test_partial_ord() {
+        let snowflake = Snowflake::new(1);
+        let snowflake2 = snowflake.next();
+        assert!(snowflake < snowflake2);
+        assert!(snowflake2.next() > snowflake2);
+        assert!(snowflake.next() == snowflake2);
     }
 }
