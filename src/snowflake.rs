@@ -50,8 +50,9 @@ impl Snowflake {
     /// use rusty_snowflake::Snowflake;
     ///
     /// let snowflake = Snowflake::new(420);
-    /// println!("{}", snowflake.next());
-    /// println!("{}", snowflake.next());
+    /// let next = snowflake.next();
+    /// println!("{}", next);
+    /// println!("{}", next.next());
     /// ```
     pub fn next(&self) -> Snowflake {
         let mut timestamp = SnowflakeGenerator::get_timestamp();
